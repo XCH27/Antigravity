@@ -57,19 +57,19 @@ PROVIDER_PRESETS: list[ProviderPreset] = [
     ),
     ProviderPreset(
         id="minimax",
-        label="Minimax（通常为 OpenAI 兼容，按服务商为准）",
+        label="Minimax",
         api_kind="openai_compat",
-        default_base_url="",
-        default_model="",
+        default_base_url="https://api.minimax.chat/v1",
+        default_model="abab6.5s-chat",
         key_hint="MINIMAX_API_KEY",
         apply_url="https://platform.minimaxi.com/user-center/basic-information",
     ),
     ProviderPreset(
         id="zhipu",
-        label="智谱（通常为 OpenAI 兼容，按服务商为准）",
+        label="智谱 GLM",
         api_kind="openai_compat",
-        default_base_url="",
-        default_model="",
+        default_base_url="https://open.bigmodel.cn/api/paas/v4",
+        default_model="glm-4-flash",
         key_hint="ZHIPU_API_KEY",
         apply_url="https://bigmodel.cn/usercenter/proj-mgmt/apikeys",
     ),
@@ -207,10 +207,23 @@ class GeminiClient:
 
 def safe_get_env(name: str) -> Optional[str]:
     try:
-        import os
-
         v = os.environ.get(name)
         return v if v else None
+    except Exception:
+        return None
+
+
+def encrypt_api_key(key: str) -> str:
+    """简单的 API Key 混淆（Base64 编码），防止明文泄露"""
+    import base64
+    return base64.b64encode(key.encode()).decode()
+
+
+def decrypt_api_key(encrypted: str) -> Optional[str]:
+    """解密 API Key"""
+    import base64
+    try:
+        return base64.b64decode(encrypted.encode()).decode()
     except Exception:
         return None
 

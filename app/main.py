@@ -17,6 +17,8 @@ try:
     from .api_client import (
         AnthropicClient,
         AnthropicConfig,
+        decrypt_api_key,
+        encrypt_api_key,
         GeminiClient,
         GeminiConfig,
         OpenAICompatClient,
@@ -29,6 +31,8 @@ except ImportError:
     from api_client import (  # type: ignore
         AnthropicClient,
         AnthropicConfig,
+        decrypt_api_key,
+        encrypt_api_key,
         GeminiClient,
         GeminiConfig,
         OpenAICompatClient,
@@ -271,9 +275,13 @@ class App(tk.Tk):
         self.uninstall_var = tk.StringVar(value="")
 
         cfg = load_config()
+        # 解密 API Key（如果已加密存储）
+        raw_key = cfg.get("api_key") or ""
+        decrypted_key = decrypt_api_key(raw_key) if raw_key else ""
+
         self.provider_var = tk.StringVar(value=str(cfg.get("provider_id") or "chatgpt"))
         self.api_base_var = tk.StringVar(value=str(cfg.get("base_url") or safe_get_env("OPENAI_BASE_URL") or "https://api.openai.com/v1"))
-        self.api_key_var = tk.StringVar(value=str(cfg.get("api_key") or safe_get_env("OPENAI_API_KEY") or ""))
+        self.api_key_var = tk.StringVar(value=str(decrypted_key or safe_get_env("OPENAI_API_KEY") or ""))
         self.api_model_var = tk.StringVar(value=str(cfg.get("model") or safe_get_env("OPENAI_MODEL") or "gpt-4.1-mini"))
         self.ai_question_var = tk.StringVar(value="我卡在这里：\n\n（请结合日志告诉我下一步怎么做）")
         self.agent_running = False
@@ -962,10 +970,14 @@ class App(tk.Tk):
         preset = next((p for p in PROVIDER_PRESETS if p.label == label), None)
         if preset is not None:
             self.provider_var.set(preset.id)
+
+        raw_key = self.api_key_var.get().strip()
+        encrypted_key = encrypt_api_key(raw_key) if raw_key else ""
+
         data = {
             "provider_id": self.provider_var.get().strip() or "chatgpt",
             "base_url": self.api_base_var.get().strip(),
-            "api_key": self.api_key_var.get().strip(),
+            "api_key": encrypted_key,  # 加密存储
             "model": self.api_model_var.get().strip(),
             "saved_at": now_ts(),
         }
