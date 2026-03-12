@@ -1,9 +1,10 @@
-# PyInstaller spec：把 assets 一起打包进 exe
-
+# PyInstaller spec: 跨平台兼容版本（Windows / macOS / Linux）
+#
 # 用法：
 #   pip install pyinstaller
 #   pyinstaller OpenClawInstaller.spec
 
+import sys
 from PyInstaller.utils.hooks import collect_submodules
 
 block_cipher = None
@@ -25,13 +26,14 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
     cipher=block_cipher,
     noarchive=False,
 )
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+
+# Windows: 使用图标
+icon_path = "assets/app_icon.ico" if sys.platform.startswith("win") else None
 
 exe = EXE(
     pyz,
@@ -44,13 +46,11 @@ exe = EXE(
     strip=False,
     upx=True,
     console=False,
-    disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    # 如果你提供了 assets/app_icon.ico，可在此启用：
-    # icon="assets/app_icon.ico",
+    icon=icon_path,
 )
 
 coll = COLLECT(
@@ -58,10 +58,8 @@ coll = COLLECT(
     a.binaries,
     a.datas,
     a.zipfiles,
-    a.metadata,
     strip=False,
     upx=True,
     upx_exclude=[],
     name="OpenClawInstaller",
 )
-
