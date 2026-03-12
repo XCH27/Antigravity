@@ -12,16 +12,30 @@ import tkinter as tk
 from dataclasses import dataclass
 from tkinter import filedialog, messagebox, ttk
 
-from .api_client import (
-    AnthropicClient,
-    AnthropicConfig,
-    GeminiClient,
-    GeminiConfig,
-    OpenAICompatClient,
-    OpenAICompatConfig,
-    PROVIDER_PRESETS,
-    safe_get_env,
-)
+try:
+    # 以包形式运行（python -m app.main）
+    from .api_client import (
+        AnthropicClient,
+        AnthropicConfig,
+        GeminiClient,
+        GeminiConfig,
+        OpenAICompatClient,
+        OpenAICompatConfig,
+        PROVIDER_PRESETS,
+        safe_get_env,
+    )
+except ImportError:
+    # PyInstaller 打包后模块被扁平化，使用绝对导入
+    from api_client import (  # type: ignore
+        AnthropicClient,
+        AnthropicConfig,
+        GeminiClient,
+        GeminiConfig,
+        OpenAICompatClient,
+        OpenAICompatConfig,
+        PROVIDER_PRESETS,
+        safe_get_env,
+    )
 
 
 def now_ts() -> str:
