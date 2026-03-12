@@ -352,30 +352,31 @@ class App(tk.Tk):
             self._refresh_status_and_step()
         self.after(100, self._drain_queue)
 
+
     def _build_ui(self) -> None:
-        nb = ttk.Notebook(self)
-        nb.pack(fill="both", expand=True)
+        ctrl = ttk.Frame(self, padding=(12, 8, 12, 0))
+        ctrl.pack(fill="x")
+        self._build_header(ctrl)
+        self._build_api_section(ctrl)
+        self._build_action_buttons(ctrl)
+        self._build_ai_question_section(ctrl)
 
-        self.tab_install = ttk.Frame(nb)
-        self.tab_ai = ttk.Frame(nb)
-        self.tab_about = ttk.Frame(nb)
+        out_nb = ttk.Notebook(self)
+        out_nb.pack(fill="both", expand=True, padx=12, pady=(6, 12))
+        self._build_log_tab(out_nb)
+        self._build_ai_answer_tab(out_nb)
 
-        nb.add(self.tab_install, text="安装 / 卸载")
-        nb.add(self.tab_ai, text="AI 辅助")
-        nb.add(self.tab_about, text="说明")
+        self._toggle_install_advanced()
+        self._toggle_api_advanced()
+        self._toggle_ai_question()
+        self._enqueue_log("欢迎使用 OpenClaw 图形化安装器。\n")
+        self._enqueue_log('提示：直接点"使用内置脚本" + "安装"即可。\n\n')
+        self._update_buttons_state()
+        self._refresh_status_and_step()
 
-        self._build_install_tab()
-        self._build_ai_tab()
-        self._build_about_tab()
-
-    def _build_install_tab(self) -> None:
-        top = ttk.Frame(self.tab_install, padding=12)
-        top.pack(fill="x")
-
-        # 顶部：步骤向导 + 状态灯 + 进度条
-        header = ttk.Frame(top)
+    def _build_header(self, parent: ttk.Frame) -> None:
+        header = ttk.Frame(parent)
         header.pack(fill="x")
-
         self.step_labels: dict[int, ttk.Label] = {}
         steps = [
             (Step.API, "1 配置 API"),
@@ -388,8 +389,7 @@ class App(tk.Tk):
             lbl.pack(side="left")
             self.step_labels[sid] = lbl
             if i != len(steps) - 1:
-                ttk.Label(header, text="›", padding=(6, 2)).pack(side="left")
-
+                ttk.Label(header, text=">", padding=(6, 2)).pack(side="left")
         header_right = ttk.Frame(header)
         header_right.pack(side="right")
         ttk.Label(header_right, text="状态：").pack(side="left")
@@ -398,169 +398,153 @@ class App(tk.Tk):
         self.status_dot = self.status_canvas.create_oval(2, 2, 12, 12, fill="#9e9e9e", outline="#9e9e9e")
         self.status_text = ttk.Label(header_right, text="空闲")
         self.status_text.pack(side="left")
+        self.progress = ttk.Progressbar(parent, mode="indeterminate")
+        self.progress.pack(fill="x", pady=(6, 0))
 
-        self.progress = ttk.Progressbar(top, mode="indeterminate")
-        self.progress.pack(fill="x", pady=(10, 0))
-
-        # 简约模式：默认不显示脚本路径，放到“高级”里
-        adv_toggle_row = ttk.Frame(top)
-        adv_toggle_row.pack(fill="x")
-        ttk.Checkbutton(
-            adv_toggle_row,
-            text="高级（显示脚本路径）",
-            variable=self.show_advanced_install_var,
-            command=self._toggle_install_advanced,
-        ).pack(side="left")
-
-        self.install_adv_frame = ttk.Frame(top)
-
-        row1 = ttk.Frame(self.install_adv_frame)
-        row1.pack(fill="x")
-        ttk.Label(row1, text="脚本目录：").pack(side="left")
-        ttk.Entry(row1, textvariable=self.skill_dir_var).pack(side="left", fill="x", expand=True, padx=8)
-        ttk.Button(row1, text="选择", command=self._pick_skill_dir).pack(side="left")
-
-        row2 = ttk.Frame(self.install_adv_frame)
-        row2.pack(fill="x", pady=(10, 0))
-        ttk.Label(row2, text="安装脚本：").pack(side="left")
-        ttk.Entry(row2, textvariable=self.install_var).pack(side="left", fill="x", expand=True, padx=8)
-        ttk.Button(row2, text="选择", command=self._pick_install).pack(side="left")
-
-        row3 = ttk.Frame(self.install_adv_frame)
-        row3.pack(fill="x", pady=(10, 0))
-        ttk.Label(row3, text="卸载脚本：").pack(side="left")
-        ttk.Entry(row3, textvariable=self.uninstall_var).pack(side="left", fill="x", expand=True, padx=8)
-        ttk.Button(row3, text="选择", command=self._pick_uninstall).pack(side="left")
-
-        btns = ttk.Frame(top)
-        btns.pack(fill="x", pady=(12, 0))
-        self.btn_install = ttk.Button(btns, text="安装", command=self._run_install)
-        self.btn_uninstall = ttk.Button(btns, text="卸载", command=self._run_uninstall)
-        self.btn_stop = ttk.Button(btns, text="停止", command=self._stop)
-        self.btn_use_bundled = ttk.Button(btns, text="使用内置脚本", command=self._use_bundled_scripts)
-        self.btn_copylog = ttk.Button(btns, text="复制日志", command=self._copy_log)
-        self.btn_clearlg = ttk.Button(btns, text="清空日志", command=self._clear_log)
-        self.btn_install.pack(side="left")
-        self.btn_uninstall.pack(side="left", padx=(8, 0))
-        self.btn_stop.pack(side="left", padx=(8, 0))
-        self.btn_use_bundled.pack(side="left", padx=(8, 0))
-        self.btn_copylog.pack(side="right")
-        self.btn_clearlg.pack(side="right", padx=(0, 8))
-
-        log_frame = ttk.Frame(self.tab_install, padding=(12, 0, 12, 12))
-        log_frame.pack(fill="both", expand=True)
-        ttk.Label(log_frame, text="运行日志：").pack(anchor="w")
-        self.log_text = tk.Text(log_frame, wrap="word")
-        self.log_text.pack(fill="both", expand=True, pady=(6, 0))
-        self.log_text.configure(state="disabled")
-
-        self._enqueue_log("欢迎使用 OpenClaw 图形化安装器。\n")
-        self._enqueue_log("提示：直接点“使用内置脚本” + “安装”即可。\n\n")
-        self._update_buttons_state()
-        self._refresh_status_and_step()
-
-    def _build_ai_tab(self) -> None:
-        top = ttk.Frame(self.tab_ai, padding=12)
-        top.pack(fill="both", expand=True)
-
-        cfg = ttk.LabelFrame(top, text="智能体 API 配置", padding=10)
-        cfg.pack(fill="x")
-
+    def _build_api_section(self, parent: ttk.Frame) -> None:
+        cfg = ttk.LabelFrame(parent, text="AI 配置", padding=(10, 6))
+        cfg.pack(fill="x", pady=(8, 0))
         r0 = ttk.Frame(cfg)
         r0.pack(fill="x")
         ttk.Label(r0, text="提供方：").pack(side="left")
         self.provider_combo = ttk.Combobox(
-            r0,
-            state="readonly",
+            r0, state="readonly",
             values=[p.label for p in PROVIDER_PRESETS],
+            width=28,
         )
-        # 显示 label，但内部用 provider_id
         self._sync_provider_combo_from_id()
-        self.provider_combo.pack(side="left", padx=8)
+        self.provider_combo.pack(side="left", padx=(4, 8))
         ttk.Button(r0, text="应用预设", command=self._apply_provider_preset).pack(side="left")
-        ttk.Button(r0, text="申请入口", command=self._copy_provider_apply_url).pack(side="left", padx=(8, 0))
-
-        r2 = ttk.Frame(cfg)
-        r2.pack(fill="x", pady=(10, 0))
-        ttk.Label(r2, text="API Key：").pack(side="left")
-        ttk.Entry(r2, textvariable=self.api_key_var, show="*").pack(side="left", fill="x", expand=True, padx=8)
-
-        r3 = ttk.Frame(cfg)
-        r3.pack(fill="x", pady=(8, 0))
-        ttk.Label(r3, text="Model：").pack(side="left")
-        ttk.Entry(r3, textvariable=self.api_model_var).pack(side="left", fill="x", expand=True, padx=8)
-        ttk.Button(r3, text="保存配置", command=self._save_api_config).pack(side="left", padx=(8, 0))
-
-        # Base URL 放到高级里（大多数人不需要）
-        api_adv = ttk.Frame(cfg)
-        api_adv.pack(fill="x", pady=(8, 0))
+        ttk.Button(r0, text="申请入口", command=self._copy_provider_apply_url).pack(side="left", padx=(6, 0))
         ttk.Checkbutton(
-            api_adv,
-            text="高级（Base URL）",
+            r0, text="高级 (Base URL)",
             variable=self.show_advanced_api_var,
             command=self._toggle_api_advanced,
-        ).pack(side="left")
-
+        ).pack(side="right")
         self.api_adv_frame = ttk.Frame(cfg)
-        r1 = ttk.Frame(self.api_adv_frame)
-        r1.pack(fill="x")
-        ttk.Label(r1, text="Base URL：").pack(side="left")
-        ttk.Entry(r1, textvariable=self.api_base_var).pack(side="left", fill="x", expand=True, padx=8)
+        r_base = ttk.Frame(self.api_adv_frame)
+        r_base.pack(fill="x", pady=(4, 0))
+        ttk.Label(r_base, text="Base URL：", width=10).pack(side="left")
+        ttk.Entry(r_base, textvariable=self.api_base_var).pack(side="left", fill="x", expand=True, padx=4)
+        r2 = ttk.Frame(cfg)
+        r2.pack(fill="x", pady=(6, 0))
+        ttk.Label(r2, text="API Key：", width=10).pack(side="left")
+        ttk.Entry(r2, textvariable=self.api_key_var, show="*").pack(side="left", fill="x", expand=True, padx=4)
+        r3 = ttk.Frame(cfg)
+        r3.pack(fill="x", pady=(4, 0))
+        ttk.Label(r3, text="Model：", width=10).pack(side="left")
+        ttk.Entry(r3, textvariable=self.api_model_var).pack(side="left", fill="x", expand=True, padx=4)
+        ttk.Button(r3, text="保存配置", command=self._save_api_config).pack(side="left", padx=(6, 0))
 
-        ask = ttk.LabelFrame(top, text="Agent / 问答", padding=10)
-        ask.pack(fill="both", expand=True, pady=(12, 0))
+    def _build_action_buttons(self, parent: ttk.Frame) -> None:
+        row = ttk.Frame(parent)
+        row.pack(fill="x", pady=(8, 0))
+        self.btn_install = ttk.Button(row, text="安装", command=self._run_install)
+        self.btn_uninstall = ttk.Button(row, text="卸载", command=self._run_uninstall)
+        self.btn_stop = ttk.Button(row, text="停止", command=self._stop)
+        self.btn_use_bundled = ttk.Button(row, text="使用内置脚本", command=self._use_bundled_scripts)
+        self.btn_install.pack(side="left")
+        self.btn_uninstall.pack(side="left", padx=(6, 0))
+        self.btn_stop.pack(side="left", padx=(6, 0))
+        self.btn_use_bundled.pack(side="left", padx=(6, 0))
+        ttk.Separator(row, orient="vertical").pack(side="left", fill="y", padx=10, pady=2)
+        self.btn_ai = ttk.Button(row, text="问答", command=self._ask_ai)
+        self.btn_agent_install = ttk.Button(row, text="自动安装", command=self._agent_auto_install)
+        self.btn_agent_stop = ttk.Button(row, text="停止 Agent", command=self._agent_stop)
+        self.btn_ai.pack(side="left")
+        self.btn_agent_install.pack(side="left", padx=(6, 0))
+        self.btn_agent_stop.pack(side="left", padx=(6, 0))
+        self.btn_copylog = ttk.Button(row, text="复制日志", command=self._copy_log)
+        self.btn_clearlg = ttk.Button(row, text="清空", command=self._clear_log)
+        self.btn_copylog.pack(side="right")
+        self.btn_clearlg.pack(side="right", padx=(0, 6))
+        adv_row = ttk.Frame(parent)
+        adv_row.pack(fill="x", pady=(4, 0))
+        ttk.Checkbutton(
+            adv_row, text="高级（显示脚本路径）",
+            variable=self.show_advanced_install_var,
+            command=self._toggle_install_advanced,
+        ).pack(side="left")
+        self.install_adv_frame = ttk.Frame(parent)
+        r1 = ttk.Frame(self.install_adv_frame)
+        r1.pack(fill="x", pady=(4, 0))
+        ttk.Label(r1, text="脚本目录：", width=10).pack(side="left")
+        ttk.Entry(r1, textvariable=self.skill_dir_var).pack(side="left", fill="x", expand=True, padx=4)
+        ttk.Button(r1, text="选择", command=self._pick_skill_dir).pack(side="left")
+        r2 = ttk.Frame(self.install_adv_frame)
+        r2.pack(fill="x", pady=(4, 0))
+        ttk.Label(r2, text="安装脚本：", width=10).pack(side="left")
+        ttk.Entry(r2, textvariable=self.install_var).pack(side="left", fill="x", expand=True, padx=4)
+        ttk.Button(r2, text="选择", command=self._pick_install).pack(side="left")
+        r3 = ttk.Frame(self.install_adv_frame)
+        r3.pack(fill="x", pady=(4, 0))
+        ttk.Label(r3, text="卸载脚本：", width=10).pack(side="left")
+        ttk.Entry(r3, textvariable=self.uninstall_var).pack(side="left", fill="x", expand=True, padx=4)
+        ttk.Button(r3, text="选择", command=self._pick_uninstall).pack(side="left")
 
-        self.ai_q_text = tk.Text(ask, wrap="word", height=10)
-        self.ai_q_text.pack(fill="x", expand=False)
+    def _build_ai_question_section(self, parent: ttk.Frame) -> None:
+        self.show_ai_question_var = tk.BooleanVar(value=False)
+        toggle_row = ttk.Frame(parent)
+        toggle_row.pack(fill="x", pady=(4, 0))
+        ttk.Checkbutton(
+            toggle_row, text="显示 AI 提问框",
+            variable=self.show_ai_question_var,
+            command=self._toggle_ai_question,
+        ).pack(side="left")
+        ttk.Button(
+            toggle_row, text="粘贴日志到提问框",
+            command=self._paste_log_to_question,
+        ).pack(side="left", padx=(8, 0))
+        self.ai_q_frame = ttk.Frame(parent)
+        self.ai_q_text = tk.Text(self.ai_q_frame, wrap="word", height=5)
+        self.ai_q_text.pack(fill="x", pady=(4, 0))
         self.ai_q_text.insert("1.0", self.ai_question_var.get())
 
-        btns = ttk.Frame(ask)
-        btns.pack(fill="x", pady=(8, 0))
-        self.btn_ai = ttk.Button(btns, text="问答", command=self._ask_ai)
-        self.btn_ai.pack(side="left")
-        self.btn_agent_install = ttk.Button(btns, text="自动安装", command=self._agent_auto_install)
-        self.btn_agent_install.pack(side="left", padx=(8, 0))
-        self.btn_agent_stop = ttk.Button(btns, text="停止 Agent", command=self._agent_stop)
-        self.btn_agent_stop.pack(side="left", padx=(8, 0))
-        ttk.Button(btns, text="粘贴日志", command=self._paste_log_to_question).pack(side="left", padx=(8, 0))
+    def _build_log_tab(self, nb: ttk.Notebook) -> None:
+        frame = ttk.Frame(nb, padding=(0, 4, 0, 0))
+        nb.add(frame, text="运行日志")
+        self.log_text = tk.Text(frame, wrap="word")
+        scroll = ttk.Scrollbar(frame, orient="vertical", command=self.log_text.yview)
+        self.log_text.configure(yscrollcommand=scroll.set, state="disabled")
+        scroll.pack(side="right", fill="y")
+        self.log_text.pack(fill="both", expand=True)
 
-        ttk.Label(ask, text="AI 回复：").pack(anchor="w", pady=(10, 0))
-        self.ai_a_text = tk.Text(ask, wrap="word")
-        self.ai_a_text.pack(fill="both", expand=True, pady=(6, 0))
-        self.ai_a_text.configure(state="disabled")
+    def _build_ai_answer_tab(self, nb: ttk.Notebook) -> None:
+        frame = ttk.Frame(nb, padding=(0, 4, 0, 0))
+        nb.add(frame, text="AI 回复")
+        self.ai_a_text = tk.Text(frame, wrap="word")
+        scroll = ttk.Scrollbar(frame, orient="vertical", command=self.ai_a_text.yview)
+        self.ai_a_text.configure(yscrollcommand=scroll.set, state="disabled")
+        scroll.pack(side="right", fill="y")
+        self.ai_a_text.pack(fill="both", expand=True)
 
-        # 默认收起高级区域
-        self._toggle_install_advanced()
-        self._toggle_api_advanced()
+    def _build_install_tab(self) -> None:
+        pass
+
+    def _build_ai_tab(self) -> None:
+        pass
+
+    def _build_about_tab(self) -> None:
+        pass
 
     def _toggle_install_advanced(self) -> None:
         if self.show_advanced_install_var.get():
-            self.install_adv_frame.pack(fill="x", pady=(10, 0))
+            self.install_adv_frame.pack(fill="x", pady=(2, 0))
         else:
             self.install_adv_frame.pack_forget()
 
     def _toggle_api_advanced(self) -> None:
         if self.show_advanced_api_var.get():
-            self.api_adv_frame.pack(fill="x", pady=(8, 0))
+            self.api_adv_frame.pack(fill="x", pady=(4, 0))
         else:
             self.api_adv_frame.pack_forget()
 
-    def _build_about_tab(self) -> None:
-        f = ttk.Frame(self.tab_about, padding=12)
-        f.pack(fill="both", expand=True)
-        txt = tk.Text(f, wrap="word")
-        txt.pack(fill="both", expand=True)
-        txt.insert(
-            "1.0",
-            "用法：\n"
-            "- 选择你的技能/脚本目录（里面包含 scripts/install.ps1 等）\n"
-            "- 点击“运行安装/运行卸载”执行 PowerShell 脚本\n"
-            "- 日志会实时显示；遇到问题可以到“AI 辅助”页把日志发给模型获取建议\n\n"
-            "安全说明：\n"
-            "- 本程序不会自动上传你的 API Key；只在你点击“发送给 AI”时才会发起 API 请求\n"
-            "- AI 只给建议，不会自动执行命令（避免误操作）\n",
-        )
-        txt.configure(state="disabled")
+    def _toggle_ai_question(self) -> None:
+        if self.show_ai_question_var.get():
+            self.ai_q_frame.pack(fill="x", pady=(2, 0))
+        else:
+            self.ai_q_frame.pack_forget()
+
 
     def _update_buttons_state(self) -> None:
         running = self.runner.running()
