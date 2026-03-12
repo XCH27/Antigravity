@@ -27,19 +27,34 @@ try:
         safe_get_env,
     )
 except ImportError:
-    # PyInstaller 打包后模块被扁平化，使用绝对导入
-    from api_client import (  # type: ignore
-        AnthropicClient,
-        AnthropicConfig,
-        decrypt_api_key,
-        encrypt_api_key,
-        GeminiClient,
-        GeminiConfig,
-        OpenAICompatClient,
-        OpenAICompatConfig,
-        PROVIDER_PRESETS,
-        safe_get_env,
-    )
+    try:
+        # PyInstaller 打包后：模块保留完整包路径 app.api_client
+        from app.api_client import (  # type: ignore
+            AnthropicClient,
+            AnthropicConfig,
+            decrypt_api_key,
+            encrypt_api_key,
+            GeminiClient,
+            GeminiConfig,
+            OpenAICompatClient,
+            OpenAICompatConfig,
+            PROVIDER_PRESETS,
+            safe_get_env,
+        )
+    except ImportError:
+        # 兜底：直接裸导入
+        from api_client import (  # type: ignore
+            AnthropicClient,
+            AnthropicConfig,
+            decrypt_api_key,
+            encrypt_api_key,
+            GeminiClient,
+            GeminiConfig,
+            OpenAICompatClient,
+            OpenAICompatConfig,
+            PROVIDER_PRESETS,
+            safe_get_env,
+        )
 
 
 def now_ts() -> str:
